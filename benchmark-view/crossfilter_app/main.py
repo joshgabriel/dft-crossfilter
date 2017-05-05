@@ -11,6 +11,15 @@ from bokeh.models import Select, Div, Column, HoverTool, ColumnDataSource, Butto
 from bokeh.plotting import figure
 from bokeh.sampledata.periodic_table import elements
 
+from pymongo import MongoClient
+
+client = MongoClient()
+
+db = client['benchmark']
+
+def_coll = db.evk
+
+
 
 df_obs = pd.read_csv('./crossfilter_app/Data/DataC.csv')
 print ('read df_obs')
@@ -22,7 +31,7 @@ print ('read df_obs')
 # dividing data into gneeral discretes and continuous
 
 columns = sorted(df_obs.columns) #+ sorted(df.columns)
-discrete = [x for x in columns if df_obs[x].dtype == object] 
+discrete = [x for x in columns if df_obs[x].dtype == object]
 
 continuous = [x for x in columns if x not in discrete]
 
@@ -229,7 +238,7 @@ class CrossFiltDFs():
                  V0_extrapol_props.update(elem_prop)
                elif p =='E0':
                  E0_extrapol_props.update(elem_prop)
-                 
+
         elems_colorpair.update( { key:'c' for key in np.unique(list(self.struct_df['element'])) } )
         elems_colorpair.update( { key:'nc' for key in list(elements['symbol']) if key not in list(elems_colorpair.keys()) } )
 
@@ -279,7 +288,7 @@ class CrossFiltDFs():
            "text_align": "left",
            "text_baseline": "middle"
                      }
- 
+
         ptable.text(x="symx", y="period", text="sym",
         text_font_style="bold", text_font_size="22pt", **text_props)
 
@@ -301,7 +310,7 @@ class CrossFiltDFs():
         ("B (GPa)", "@B"),
         ("dB/dP", "@dB")]
         return ptable
-    
+
     def create_figure(self,dataset,datplot='Init',plot_type=None):
         """
         figure and plot creation for a given dataset
@@ -312,8 +321,8 @@ class CrossFiltDFs():
         kw = dict()
 
         x_title = x_select.value.title() + ' Density per atom'
-        
-        # hack for labels now 
+
+        # hack for labels now
 
         if isinstance(dataset,pd.DataFrame):
           if np.unique(list(dataset['property']))[0]=='B':
@@ -386,7 +395,7 @@ class CrossFiltDFs():
                print('executes till line')
                return self.p
 
-        
+
 
         else:
           # clear the figure by plotting an empty figure
@@ -429,7 +438,7 @@ class CrossFiltDFs():
        layout.children[2] =  self.update_ptable()
        elem_checkbox= CheckboxButtonGroup(labels=np.unique(list(self.struct_df['element'])), active=[1])
        controls2.children[2] = elem_checkbox
-       
+
        self.plot_data = self.struct_df
        print ('finished callback to update layout')
 
@@ -446,6 +455,30 @@ class CrossFiltDFs():
 
     def update_y(self):
         pass
+
+    def query_db(self,query):
+        """
+        query can be some random user query in form of a dict.
+        this method should check if the query makes sense
+        Eg: if a multi-selection, split the mongo query into
+        single value selections for that parameter, mostly the
+        multi-selection case would be for elements
+        """
+        ### ADVANCED: check the nature of query
+        query_set = []
+        for k in list(query.keys()):
+            for v in query[k]:
+                one_query = {k:v}
+                one_query.update({other_k:query[other_k][0]} for other_k in list(query.keys()) if other_k != k })
+                query_set.append(one_query)
+        ##############
+        docs = def_coll.find(query)
+        if docs:
+            dframe = pd.concat([pd.DataFrame({key: [doc[key]] for key in ['energy','volume']}) for doc in docs])
+        else:
+            # query not found handling
+            return (0)
+        return (dframe)
 
     def update_crossfilter(self):
        print ('Triggering crossfilter')
