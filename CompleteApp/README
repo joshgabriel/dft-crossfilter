@@ -1,0 +1,32 @@
+The package now contains
+
+- benchmark-db models for the DB
+- data - all the data in .csv format and a python script to test the api POST query 
+         and file push
+- benchmark-api* flask app which exposes the DB at various endpoints corresponding
+                to the models in the DB
+- benchmark-precision library of python functions for manipulations
+- crossfilter_app*! - the working main page bokeh app for now
+- prec_analysis*! - under dev bokeh app for plotting visualizations 
+                     - pade function with R interaction for fitting
+- accuracy_correlation*! - TO DO: a machine learning app that finds correlations in accuracies 
+                        between different properties. 
+
+* - will be served by Nginx 
+! - are linked to each other by hyperlinks on the respective webpages 
+
+NOTE: Copy the eos.py module to the ase root installation in the miniconda environment
+
+Also install the package benchmark-precision now with python setup.py install
+
+Developer's Notes:
+
+To create a new app which has a new model:
+  - edit query_api.py and benchdb.models.row_model.py in concert and test
+    the new api endpoint with test_api.py located in benchmark-api
+  - after testing with a mongo shell and the test_api.py, do a python setup.py install
+    for benchdb
+  - create a new bokeh app folder, you can use prec_analysis as an example
+  - if new python/R analysis tools are required edit precisions.py and other
+    *.py scripts in benchmark-precision. Do a python setup.py install for benchmark-precision
+
