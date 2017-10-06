@@ -72,7 +72,7 @@ def getVersion(version, release=False):
         return version + '-dev.' + _git_version
 
 setup(name='benchdb',
-      version=make_version(),
+      version='0.2.0',
       description='Package for Benchmark Database',
       author='Faical Yannick Palingwende Congo',
       author_email='faical.congo@nist.gov',

@@ -15,6 +15,7 @@ MultiSelect
 #from bokeh.models.widgets import RangeSlider
 from bokeh.plotting import figure
 from bokeh.sampledata.periodic_table import elements
+from precision.precisions import DatabaseData
 
 import requests
 
@@ -31,7 +32,7 @@ content_filename1 = join(dirname(__file__), "ptable.html")
 description1 = Div(text=open(content_filename1).read(),
                   render_as_text=False, width=600)
 
-content_filename2 = join(dirname(__file__), "HomePage.html")
+content_filename2 = join(dirname(__file__), "UserInstructions.html")
 
 description2 = Div(text=open(content_filename2).read(),
                   render_as_text=False, width=600)
@@ -186,6 +187,32 @@ class CrossFiltDFs():
         """
         col,spec= list(tag.items())[0]
         return df[df[col]==spec]
+
+    def query_ptable_api(self,endpoint):
+        r = requests.post(url='http://0.0.0.0:6400/bench/v1/query_{}'.\
+                          format(endpoint),data=json.dumps(self.query_dict))
+        ListOfDicts = r.json()['content']
+        self.plot_data = pd.concat([pd.DataFrame({k:[ld[k]] for k in list(ld.keys())}) for ld in ListOfDicts])
+
+
+    def query_api(self,endpoint):
+        query_dict ={k:v for k,v in self.query_dict.items() if k!='properties'}
+        self.properties = self.query_dict['properties']
+        if self.properties == 'dB':
+            self.properties = 'BP'
+        r = requests.post(url='http://0.0.0.0:6400/bench/v1/query_{}'.\
+                          format(endpoint),data=json.dumps(self.query_dict))
+        ListOfDicts = r.json()['content']
+        self.plot_data = pd.concat([pd.DataFrame({k:[ld[k]] for k in list(ld.keys())}) for ld in ListOfDicts])
+
+
+    def create_figure_new(self):
+        """
+        create a new multi-figure canvas
+        """
+        kw = {}
+        self.p = figure(plot_height=400, plot_width=400, tools='pan,wheel_zoom,box_zoom,reset,hover', **kw)
+        self.p.circle(x=[0],y=[0])
 
 
     def update_ptable(self):
@@ -365,175 +392,11 @@ class CrossFiltDFs():
         ("hcp, dB/dP", "@hcp_dB")]
         return ptable
 
-    def convert_multi_query_to_dicts(self,user_query):
-        """
-        """
-        for k in user_query:
-            self.query_api(endpoint='precvalue')
-        pass
-
-    def plot_prec_value(self):
-       print ('Triggering crossfilter')
-       print ('executes this on startup')
-       layout.children[6] = self.multi_2Dplot_pade_figure(self.plot_data)
-
-    def multi_2Dplot_pade_figure(self,datasets):
-        """
-        method which plots multiple curves of different color
-        on the same bokeh figure canvas. Will receive query results from the precvalue
-        end point on the E0k, V0k, Bk, BPk, kpoints data. x is always kpoints data log scaled
-
-        Example user query is {'code':'VASP','exchange':'PBE','element':'Al','structure':'fcc','property':'B'} +
-                              {'code':'VASP','exchange':'PBE','element':'Al','structure':'hcp','property':'B'} +
-                              {'code':'DMol3','exchange':'LDA','element':'Al','structure':'fcc', 'property':'B'} +
-                              {'code':'DMol3','exchange':'LDA','element':'Al','structure':'hcp', 'property':'B'}
-        """
-        # receive a dict of datasets: {'Plot1':{'x':[],'y':[], 'x_title': None, 'y_title': None,
-        # 'Characteristic':'VASP_PBE_Al_fcc_B'}, 'Plot2':{'x':[],'y':[], 'x_title': None, 'y_title': None}}
-
-        def color_marker_divider(characteristics):
-            cm_keys= {'00':('red','*'),'01':('red','-.-'),'02':('red','*'),'03':('red','^'),\
-             '10':('blue','*'),'11':('blue','-.-'),'12':('blue','*'),'13':('blue','^')
-             }
-            DictCharacters = \
-            [{n:att for n,att in enumerate(c.split('_'))} for c in characteristics]
-            # one or two char value different and same code and exchange: same color different marker
-            # else different color and marker.
-            return cm_keys
-        kw = {}
-        kw['title'] = 'Pade Analysis Plots'
-        kw['x_axis_type'] = 'log'
-        self.p1 = figure(plot_height=600, plot_width=800, tools='pan,wheel_zoom,box_zoom,reset,hover', **kw)
-
-        self.p1.xaxis.axis_label = x_title
-        self.p1.yaxis.axis_label = y_title
-        #color_marker_divider(characteristics)
-        for dset in datasets:
-            xs = datasets[dset]['x']
-            ys = datasets[dset]['y']
-            #c,m = color_marker_divider(characteristics)['00']
-            self.p1.scatter(x=xs, y=ys)#, alpha=1.0, hover_color='blue', hover_alpha=1.0)
-        return self.p1
-
-    def multi_precisions_correlate(self, datasets):
-        """
-        method which allows the user to plot various precisions
-        against each other. Also prints out the M-value and intercepts
-        of precision at 1 meV/atom, 0.1 meV/atom and 0.01 meV/atom
-        """
-        pass
-
-    def kpoints_interactive_selector(self, dataset):
-        """
-        method which creates a pareto optimal plot for the chosen structure, material,
-        code and exchange and with the user input of desired precision returns
-        the kpoints per atom choice.
-        """
-        pass
-
-    def pade_visualize(self,dataset):
-        """
-        method which creates the Pade contour interpolation over the
-        raw evk data. Receives query result from the evk endpoint
-        """
-        pass
-
-    def create_figure(self,dataset,datplot='Init',plot_type=None):
-        """
-        figure and plot creation for a given dataset
-        TODO: enable support for multiple selection
-        refactor to a simple figure creator and
-        add helper functions for the plots
-        """
-        kw = dict()
-
-        x_title = x_select.value.title() + ' Density per atom'
-
-        # hack for labels now
-
-        if isinstance(dataset,pd.DataFrame):
-          if np.unique(list(dataset['properties']))[0]=='B':
-             y_title = 'Bulk Modulus (GPa) '+y_select.value.title()
-          elif np.unique(list(dataset['properties']))[0]=='dB':
-             y_title = 'dB/dP '+y_select.value.title()
-          elif np.unique(list(dataset['properties']))[0]=='v0':
-             y_title = 'Volume per atom (A^3) '+y_select.value.title()
-          elif np.unique(list(dataset['properties']))[0]=='E0':
-             y_title = 'DFT Energy per atom (eV/atom) '+y_select.value.title()
-        else:
-             y_title = 'Pade Prediction'
-
-        kw['title'] = "%s vs %s" % (y_title, x_title)
-
-        #if x_select.value=='k-point':
-        kw['x_axis_type'] = 'log'
-
-        if x_select.value == 'perc_precisions' and y_select.value == 'perc_precisions':
-          kw['y_axis_type'] = 'log'
-
-        self.p = figure(plot_height=600, plot_width=800, tools='pan,wheel_zoom,box_zoom,reset,hover', **kw)
-
-        # sets the axes
-        self.p.xaxis.axis_label = x_title
-        self.p.yaxis.axis_label = y_title
-
-
-        #if x_select.value in continuous:
-        self.p.xaxis.major_label_orientation = pd.np.pi / 4
-
-
-        #print (dataset)
-        if datplot=='Init':
-           # if data is to be plotted
-           xs = [1,2,3,4]#dataset[x_select.value].values
-           ys = [1,2,3,4]#dataset[y_select.value].values
-           self.xs_init = xs
-           self.ys_init = ys
-
-           self.p.scatter(x=xs, y=ys)#, alpha=1.0, hover_color='blue', hover_alpha=1.0)
-           return self.p
-
-        elif datplot == 'Add':
-           # add a plot to figure, from statistical analysis
-           if plot_type == 'plot_pade':
-
-               #pade_order = self.analysis_results['Order']
-               #pade_extrapolate = self.analysis_results['Extrapolate']
-               #print (pade_extrapolate, float(pade_extrapolate))
-
-               # create precisions based on the extrapolate
-               #print (self.add_data)
-               xs = self.add_data[0]
-               ys = self.add_data[1]#[abs(y-pade_extrapolate) for y in self.ys_init]
-               #print (ys)
-               # print (xs,ys,len(xs),len(ys))
-               print ("Plots a line supposedly")
-               #print (len(self.ys_init), len(ys))
-               #l = min([len(self.ys_init), len(ys), len(self.xs_init),len(xs)])
-               #self.plot_layout.scatter(x=self.xs_init[0:l], y=self.ys_init[0:l])#, alpha=1.0, hover_color='blue', hover_alpha=1.0)
-               #print (type(self.plot_layout))
-               #self.p.self.plot
-               self.p = figure(plot_height=600, plot_width=800, tools='pan,wheel_zoom,box_zoom,reset,box_zoom, hover', **kw)
-               print('executes till re-figure')
-               self.p.circle(x=self.xs_init,y=self.ys_init)
-               print('executes till circle')
-               self.p.line(x=xs, y=ys, line_color='red')
-               #self.p.line_color='red'
-               print('executes till line')
-               return self.p
-
-        else:
-          # clear the figure by plotting an empty figure
-          xs = []
-          ys = []
-          self.p = figure(plot_height=600, plot_width=800, tools='pan,wheel_zoom,box_zoom,reset,hover', **kw)
-          self.p.scatter(x=xs, y=ys)#, alpha=1.0, hover_color='blue', hover_alpha=1.0)
-          return self.p
-
     # The crossfilter widgets
     def update(self, attr, old, new):
        print ('Attribute', attr, 'OLD', old, 'NEW', new)
        print ('executes here on update')#, exchange_df)
+
 
     def update_code(self):
         """
@@ -550,84 +413,178 @@ class CrossFiltDFs():
         self.query_dict.update({'exchange':exchange.value})
 
     def update_element(self,new):
-        print ('Updating element down selection for properties',element.active[0])
-        self.query_dict.update({'element':element.active[0]})
+        print ('Updating element down selection for properties',element.value)
+        self.query_dict.update({'element':element.value})
 
     def update_struct(self):
        print ('Updating struct down selection for element')
        self.query_dict.update({'structure':struct.value})
        print ('Updating ptable with structure selection')
-       layout.children[1] =  self.update_ptable()
        print ('finished callback to update layout')
 
     def update_prop(self):
-       self.query_dict.update({'properties':prop.value})
-
-    def update_kpoints(self):
-        pass
-
-    def update_x(self):
-        self.x = x.value
-        pass
-
-    def update_y(self):
-        self.y = y.value
-        pass
-
-    def query_api(self,endpoint):
-        r = requests.post(url='http://0.0.0.0:6400/bench/v1/query_{}'.\
-                          format(endpoint),data=json.dumps(self.query_dict))
-        ListOfDicts = r.json()['content']
-        self.plot_data = pd.concat([pd.DataFrame({k:[ld[k]] for k in list(ld.keys())}) for ld in ListOfDicts])
+       self.properties = prop.value
 
 
+    def plot_prec_value1(self):
+       """
+       calls the plotting operation by querying the
+       evk endpoint and returning a single evk packet
+       of single material structure code exchange to
+       self.plot_data.
+       This controls the first plot canvas
+       """
+       self.query_dict={'code':code.value,'exchange':exchange.value,\
+                    'structure':struct.value,'element':element.value,'properties':prop.value}
+       print ('POSTING', self.query_dict)
+       self.query_api(endpoint='evk')
 
-    def clear_crossfilter(self):
+       layout_doc.children[4].children[0] = self.plot_pade_figure()
+
+    def clear_crossfilter1(self):
         """
         clear the figure and crossfilter
         """
         print ('Trigger clear')
+        self.query_dict = {}
         self.plot_data = None
-        layout.children[6] = self.create_figure(self.plot_data)
+        self.create_figure_new()
+        layout_doc.children[4].children[0] = self.p
 
-    def analysis_callback(self):
+    def plot_prec_value2(self):
+       """
+       calls the plotting operation by querying the
+       evk endpoint and returning a single evk packet
+       of single material structure code exchange to
+       self.plot_data.
+       This controls the first plot canvas
+       """
+       self.query_dict={'code':code2.value,'exchange':exchange2.value,\
+                    'structure':struct2.value,'element':element2.value,'properties':prop2.value}
+       print ('POSTING', self.query_dict)
+       self.query_api(endpoint='evk')
+
+       layout_doc.children[4].children[1] = self.plot_pade_figure()
+
+    def clear_crossfilter2(self):
         """
-        calls the Pade analysis on the current plot data
-        TODO:
-        NOTE: check if this is a data set that is a single scatter
-        FEATUREs that could be added: plot the Pade for multiple selections
+        clear the figure and crossfilter
         """
-        print ('called Pade analysis')
-        # writes out the crossfiltered plot data on the server
-        crossfilt = self.plot_data[['k-point','value']]
-        crossfilt.columns=['Kpt','P']
-        crossfilt.to_csv('crossfilter_app/Rdata.csv')
-        print ('wrote out data file')
-        os.system('Rscript crossfilter_app/non_err_weighted_nls.R')
-        self.analysis_results = pd.read_csv('crossfilter_app/Result.csv')
-        #self.add_data = [ list(self.xs_init), list(self.predict_results['Preds....c.predict.m2..']) ]
-        ext_values = list(self.analysis_results['Extrapolate....extrapolates'])
-        error_values = list(self.analysis_results['Error....errors'])
-        self.ext_min_error = ext_values[error_values.index(min(error_values))]
-        print ('executed R script on crossfiltered data')
-        if error_values.index(min(error_values))==0:
-            self.predict_results = pd.read_csv('crossfilter_app/Pade1.csv')
-            self.add_data = [list(self.predict_results['Px....x_plot']), list(self.predict_results['Py....pade1.x_plot.'])]
-        elif error_values.index(min(error_values))==1:
-            self.predict_results = pd.read_csv('crossfilter_app/Pade2.csv')
-            self.add_data = [list(self.predict_results['Px....x_plot']), list(self.predict_results['Py....pade2.x_plot.'])]
+        print ('Trigger clear')
+        self.query_dict = {}
+        self.plot_data = None
+        self.create_figure_new()
+        layout_doc.children[4].children[1] = self.p
 
-        print ('ADD DATA', self.add_data)
-        layout.children[4] = self.create_figure(self.add_data, datplot='Add', plot_type='plot_pade')
 
-def update():
-    pass
-    #source_data = CF.plot_data
+    def plot_pade_figure(self):
+        """
+        method which plots multiple curves of different color
+        on the same bokeh figure canvas. Will receive query results from the evk
+        end point on the E0k, V0k, Bk, BPk, kpoints data. x is always kpoints data log scaled
+        """
+        data_analysis = DatabaseData(dataframe=self.plot_data)
+        print (data_analysis.dataframe.columns)
+        data_analysis.run_pade_through_R(rscript='birch',get_inits_ev=True)
+        data_analysis.create_precisions()
+        data_analysis.extract_pade_curve()
+        x_eos_kpts, y_eos, xs_err, ys_err, x_pade_kpts, y_pade = \
+        data_analysis.create_pade_bokeh_compat(properties=self.properties)
+        print (type(self.properties), self.properties)
+        if self.properties == 'B':
+            ext = data_analysis.Bp
+            print ('HERE AT PROPERTIES', ext, type(ext))
+        elif self.properties == 'BP':
+            ext = data_analysis.BPp
+        elif self.properties == 'E0':
+            ext = data_analysis.E0p
+        elif self.properties == 'V0':
+            ext = data_analysis.V0p
+        p = figure(plot_height=400, plot_width=400,tools="pan,wheel_zoom,box_zoom,reset,previewsave",\
+        x_axis_type="log", x_axis_label='K-points per atom',  title='Pade Extrapolate of {0} is {1}'.format(self.properties, str(ext)) )
+        p.xaxis.axis_label = 'K-points per atom'
+        p.line(x_pade_kpts, y_pade, color='red')
+        p.circle(x_eos_kpts, y_eos,color='blue',size=5, line_alpha=0)
+        p.multi_line(xs_err, ys_err, color='black')
+        if self.properties == 'B':
+            p.yaxis.axis_label = 'Bulk Modulus B (GPa)'
+        elif self.properties == 'dB':
+            p.yaxis.axis_label = 'Bulk Modulus Pressure Derivative'
+        elif self.properties == 'E0':
+            p.yaxis.axis_label = 'DFT Energy (eV/atom)'
+        elif self.properties == 'V0':
+            p.yaxis.axis_label = 'Volume (A^3/atom)'
+
+        return p
+
+    def plot_precision_figure(self):
+        """
+        method which plots multiple curves of different color
+        on the same bokeh figure canvas. Will receive query results from the evk
+        end point on the E0k, V0k, Bk, BPk, kpoints data. x is always kpoints data log scaled
+        """
+
+        data_analysis = DatabaseData(dataframe=self.plot_data)
+        prop_data, energy_data, M, C, pred_energy, pred_property = \
+        data_analysis.create_precision_bokeh_compat(self.prop_data, self.energy_data, properties=self.properties)
+        p = figure(plot_height=400, plot_width=400,tools="pan,wheel_zoom,box_zoom,reset,previewsave",\
+        x_axis_type="log", y_axis_type="log", x_axis_label='Energy Convergence (meV/atom)',  title='Slope M is {0}'.format(str(M)) )
+        p.line(pred_energy, pred_property, color='red')
+        p.circle(energy_data, prop_data, color='blue',size=5, line_alpha=0)
+        #p.multi_line(xs_err, ys_err, color='black')
+        if self.properties == 'B':
+            p.yaxis.axis_label = 'Bulk Modulus B (%)'
+        elif self.properties == 'dB':
+            p.yaxis.axis_label = 'Bulk Modulus Pressure Derivative (%)'
+        elif self.properties == 'Multiple':
+            p.yaxis.axis_label = "V0, B, B' (%)"
+        elif self.properties == 'V0':
+            p.yaxis.axis_label = 'Volume (%)'
+
+        return p
+
+
+    def multi_precisions_correlate1(self):
+        """
+        method which allows the user to plot various precisions
+        against each other. Also prints out the M-value and intercepts
+        of precision at 1 meV/atom, 0.1 meV/atom and 0.01 meV/atom
+        """
+        self.query_dict={'code':code.value,'exchange':exchange.value,\
+                        'structure':struct.value,'element':element.value,'properties':prop.value}
+        print ('POSTING', self.query_dict)
+        if not self.query_dict['properties'] == 'Multi':
+            self.query_api(endpoint='precvalue')
+            self.prop_data = self.plot_data['s{}k'.format(self.properties)]
+            self.energy_data = self.plot_data['sE0k'.format(self.properties)]
+
+        layout_doc.children[4].children[0] = self.plot_precision_figure()
+        pass
+
+    def multi_precisions_correlate2(self):
+        """
+        method which allows the user to plot various precisions
+        against each other. Also prints out the M-value and intercepts
+        of precision at 1 meV/atom, 0.1 meV/atom and 0.01 meV/atom
+        """
+        self.query_dict={'code':code2.value,'exchange':exchange2.value,\
+                        'structure':struct2.value,'element':element2.value,'properties':prop2.value}
+        print ('POSTING', self.query_dict)
+        if not self.query_dict['properties'] == 'Multi':
+            self.query_api(endpoint='precvalue')
+            self.prop_data = self.plot_data['s{}k'.format(self.properties)]
+            self.energy_data = self.plot_data['sE0k'.format(self.properties)]
+        layout_doc.children[4].children[1] = self.plot_precision_figure()
+
+
+
+## PTABLE
+
 
 CF = CrossFiltDFs(query_dict={'code':'VASP','exchange':'PBE'})
 
 # first query for the periodic table data
-CF.query_api(endpoint='extrapolate')
+CF.query_ptable_api(endpoint='extrapolate')
 print (CF.plot_data)
 
 # for the first table to display VASP PBE all structures Pade extrapolates for all properties
@@ -635,7 +592,113 @@ print (CF.plot_data)
 
 ptable1 = CF.update_ptable()
 
-layout_doc = column(description1, ptable1, description2)
+
+## PLOT 1
+
+CF1 = CrossFiltDFs()
+
+codes = ['DMol3','VASP']
+code = Select(title='Code 1', value='VASP', options=codes)
+code.on_change('value', lambda attr, old, new: CF1.update_code())
+
+exchanges = ['LDA','PBE']
+exchange = Select(title='ExchangeCorrelation 1', value='PBE', options=exchanges)
+exchange.on_change('value', lambda attr, old, new: CF1.update_exchange())
+
+structures = ['fcc','bcc','hcp']
+struct = Select(title='Structure 1', value='fcc', options=structures)
+struct.on_change('value', lambda attr, old, new: CF1.update_struct())
+
+_elements = ['Al','Au','Sc', 'Ti','V','Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
+'Rb', 'Sr','Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag','Cd',
+'Cs','Ba','Hf','Ta','W','Re','Os','Ir','Pt','Hg']
+element = Select(title='Metals 1', value='Pt', options=_elements)
+element.on_change('value', lambda attr, old, new: CF1.update_element())
+
+properties = ['B','dB','V0','E0']
+prop = Select(title='Properties 1', value='E0', options=properties)
+prop.on_change('value', lambda attr, old, new: CF1.update_prop())
+
+#range_slider_lowK1 = RangeSlider(start=-5, end=5, value=(-5,5), step=1, title="Low K-point")
+#range_slider_medK1 = RangeSlider(start=-5, end=5, value=(-5,5), step=1, title="Medium K-point")
+#range_slider_highK1 = RangeSlider(start=-5, end=5, value=(-5,5), step=1, title="High K-point")
+
+apply_crossfilter = Button(label='Values vs. Kpoints')
+apply_crossfilter.on_click(CF1.plot_prec_value1)
+
+apply_precision = Button(label='Inter-Property Precision')
+apply_precision.on_click(CF1.multi_precisions_correlate1)
+
+clean_crossfilter = Button(label='Clear')
+clean_crossfilter.on_click(CF1.clear_crossfilter1)
+
+CF1.query_dict={'code':'VASP','exchange':'PBE',\
+                'structure':'fcc','element':'Pt','properties':'E0'}
+
+
+
+
+## PLOT 2
+
+
+CF2 = CrossFiltDFs()
+
+codes2 = ['DMol3','VASP']
+code2 = Select(title='Code 2', value='VASP', options=codes2)
+code2.on_change('value', lambda attr, old, new: CF2.update_code())
+
+exchanges2 = ['LDA','PBE']
+exchange2 = Select(title='ExchangeCorrelation 2', value='PBE', options=exchanges2)
+exchange2.on_change('value', lambda attr, old, new: CF2.update_exchange())
+
+structures2 = ['fcc','bcc','hcp']
+struct2 = Select(title='Structure 2', value='fcc', options=structures2)
+struct2.on_change('value', lambda attr, old, new: CF2.update_struct())
+
+_elements2 = ['Al','Au','Sc', 'Ti','V','Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
+'Rb', 'Sr','Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag','Cd',
+'Cs','Ba','Hf','Ta','W','Re','Os','Ir','Pt','Hg']
+element2 = Select(title='Metals 2', value='Pt', options=_elements2)
+element2.on_change('value', lambda attr, old, new: CF2.update_element())
+
+properties2 = ['B','dB','V0','E0']
+prop2 = Select(title='Properties 2', value='V0', options=properties2)
+prop2.on_change('value', lambda attr, old, new: CF2.update_prop())
+
+#range_slider_lowK2 = RangeSlider(start=-5, end=5, value=(-5,5), step=1, title="Low K-point")
+#range_slider_medK2 = RangeSlider(start=-5, end=5, value=(-5,5), step=1, title="Medium K-point")
+#range_slider_highK2 = RangeSlider(start=-5, end=5, value=(-5,5), step=1, title="High K-point")
+
+apply_crossfilter2 = Button(label='Values vs. Kpoints')
+apply_crossfilter2.on_click(CF2.plot_prec_value2)
+
+clean_crossfilter2 = Button(label='Clear')
+clean_crossfilter2.on_click(CF2.clear_crossfilter2)
+
+apply_precision2 = Button(label='Inter-Property Precision')
+apply_precision2.on_click(CF1.multi_precisions_correlate2)
+
+CF2.query_dict={'code':'VASP','exchange':'PBE',\
+                'structure':'fcc','element':'Pt','properties':'V0'}
+
+
+
+
+CF1.create_figure_new()
+CF2.create_figure_new()
+
+
+
+controls1 = widgetbox([code, exchange, struct, element, prop, apply_crossfilter, apply_precision, clean_crossfilter],width=400)
+                       #range_slider_lowK1, range_slider_medK1, range_slider_highK1], width=300)
+controls2 = widgetbox([code2, exchange2, struct2, element2, prop2,apply_crossfilter2, apply_precision2, clean_crossfilter2],width=400)
+                        #range_slider_lowK2, range_slider_medK2, range_slider_highK2, width=300)
+
+
+
+#layout_doc = column(description1, ptable1, description2)
+
+layout_doc = layout([description1],[ptable1],[description2],[controls1, controls2], [CF1.p, CF2.p])
 
 #layout_doc = layout([description1],\
 #                    [ptable1],\
@@ -652,4 +715,7 @@ print ('executed till here')
 
 curdoc().add_root(layout_doc)
 curdoc().title = "DFT Benchmark"
-update()
+
+CF1.plot_prec_value1()
+CF2.plot_prec_value2()
+

@@ -4,12 +4,12 @@ library(minpack.lm)
 #library(webshot)
 #library(rsm)
 
-mydata = read.csv("./Rdata.csv")  # Read CSV data file
-x<-mydata$kpts         # Select the kpoints atom density
+mydata = read.csv("Rdata.csv")  # Read CSV data file
+x<-mydata$kpoints         # Select the kpoints atom density
 V<-mydata$volume
 E<-mydata$energy
 
-init_data = read.csv("./Rdata_init.csv")
+init_data = read.csv("Rdata_init.csv")
 v0<-init_data$V0
 E0<-init_data$E0
 B<-init_data$B

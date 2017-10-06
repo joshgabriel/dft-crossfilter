@@ -40,6 +40,7 @@ try:
    from ase.eos import EquationOfState
 except:
    print ('Warning: import ase fail')
+#from mpinterfaces.utils import print_exception
 
 #logger = get_logger('Warnings')
 
@@ -65,6 +66,7 @@ class DatabaseData:
         this function can serve further as a
         generalized query to the mongoDB
         """
+        #print (db.columns, db['code'], tags['code'])
         tag1_database = db[db['code']==tags['code']]
         tag2_database = tag1_database[tag1_database['exchange']==tags['exchange']]
         tag3_database = tag2_database[tag2_database['element']==tags['element']]
@@ -82,7 +84,7 @@ class DatabaseData:
             3. calculate and return rms error of the eos fit
             """
             try:
-              Eos = EquationOfState(volume, energy, eos=eos_name)
+              Eos = EquationOfState(volume, energy, eos='birch')
               E0, E0_err, V0, V0_err,\
                B, B_err, BP , BP_err,y_pred = Eos.fit()
               if return_params:
@@ -91,6 +93,7 @@ class DatabaseData:
                  return (E0, E0_err, V0, V0_err, B, B_err, BP, BP_err)
             except:
               #logger.warn('Exception eos')
+              #print (print_exception())
               if return_rms:
                  return ('xxx')
               else:
@@ -99,7 +102,7 @@ class DatabaseData:
             if not return_rms and not return_params:
                # for high k- points initial fit values return
                #print ('High K!')
-               pd.DataFrame({'E0':[E0],'V0':[V0],'B':[B],'BP':[BP]}).to_csv('./prec_analysis/Rdata_init.csv', index=False)
+               pd.DataFrame({'E0':[E0],'V0':[V0],'B':[B],'BP':[BP]}).to_csv('./Rdata_init.csv', index=False)
                #print (E0,V0,B,BP)
             else:
                # calculate rms error of fit
@@ -238,7 +241,7 @@ class DatabaseData:
 
 
         if list(fit_data['energy']):
-           fit_data.to_csv('./prec_analysis/Rdata.csv', index=False)
+           fit_data.to_csv('./Rdata.csv', index=False)
 
            # for first inits?
            if get_inits_ev:
@@ -251,16 +254,17 @@ class DatabaseData:
                self.fit_rms_set = {}
                self.get_avg_rms_fit_error(data=run_R_data,name=NAME,eos_name=rscript)
 
-           self.result['element'] = np.unique(list(self.dataframe['element']))
-           self.result['exchange'] = np.unique(list(self.dataframe['exchange']))
-           self.result['code'] = np.unique(list(self.dataframe['code']))
-           self.result['structure'] = np.unique(list(self.dataframe['structure']))
+           self.result['element'] = str(np.unique(list(self.dataframe['element']))[0])
+           self.result['exchange'] = str(np.unique(list(self.dataframe['exchange']))[0])
+           self.result['code'] = str(np.unique(list(self.dataframe['code']))[0])
+           self.result['structure'] = str(np.unique(list(self.dataframe['structure']))[0])
            # for calculating the precisions?
            for k in np.unique(list(run_R_data['kpoints'])):
               end_kpt_data = run_R_data[run_R_data['kpoints']==k]
               E0, E0_err, V0, V0_err, B, B_err, BP, BP_err = \
               self.fit_ev(list(end_kpt_data['energy']),\
                       list(end_kpt_data['volume']),rscript, return_params=True)
+              #print ('E0 value: {}'.format(E0))
               if E0 and E0!='Warn':
                  self.ev_fits = {'E0_eos':E0,'E0_eos_err': E0_err,
                               'V0_eos':V0, 'V0_eos_err':V0_err,
@@ -297,6 +301,7 @@ class DatabaseData:
             os.system('Rscript {}_nls.R'.format(rscript))
             print ('R executed')
             R_result = pd.read_csv('Result_table.csv')
+
             #key = list(R_result['Error']).index(min(list(R_result['Error'])))
             self.result['E0'] = list(R_result['Extrapolate'])[0]
             self.result['E0_err'] = list(R_result['Error'])[0]
@@ -310,9 +315,9 @@ class DatabaseData:
             self.result['bB'] = list(R_result['Extrapolate'])[5]
             self.result['bBP'] = list(R_result['Extrapolate'])[6]
             self.result['bV0'] = list(R_result['Extrapolate'])[7]
-            self.result['nKpoints'] = len(np.unique(run_R_data['kpts']))
+            self.result['nKpoints'] = len(np.unique(run_R_data['kpoints']))
             #print (max(np.unique(run_R_data['kpts'])))
-            self.result['maxKpoints'] = max(np.unique(run_R_data['kpts']))
+            self.result['maxKpoints'] = max(np.unique(run_R_data['kpoints']))
             print ("R success")
             #nam = '_'.join([NAME, 'maxK',str(self.result['maxKpoints']),'nK',str(self.result['nKpoints'])])
             #if plot_contours:
@@ -376,6 +381,84 @@ class DatabaseData:
                           'k':[r['k'] for r in self.ev_fit_records]
                          })
 
+    def extract_pade_curve(self):
+        """
+        extracts the pade curve over a continuous range of available
+        kpoints to plot a smooth curve
+        """
+        print ('extracting pade curve')
+        #print (self.pade_analysis_table)
+        self.pade_frames = []
+        for c in np.unique(self.pade_analysis_table['code']):
+            code = self.pade_analysis_table[self.pade_analysis_table['code']==c]
+            for e in np.unique(code['exchange']):
+                exch = code[code['exchange']==e]
+                for el in np.unique(exch['element']):
+                    elem = exch[exch['element']==el]
+                    for st in np.unique(elem['structure']):
+                        struct = elem[elem['structure']==st]
+                        tags = {'code': str(c),
+                            'exchange': str(e),
+                            'element': str(el),
+                            'structure': str(st)}
+                        #print (self.ev_fit_table)
+                        coeff = self.create_crossfilts(tags,self.pade_analysis_table)
+                        vals = self.create_crossfilts(tags,self.ev_fit_table)
+                        kpts = list(vals['k'])
+                        try:
+
+                              kpt_space = np.linspace(min(kpts),max(kpts))
+
+                              E0 = float(list(coeff['E0'])[0])
+                              V0 = float(list(coeff['V0'])[0])
+                              B = float(list(coeff['B'])[0])
+                              BP = float(list(coeff['BP'])[0])
+                              bE0 = float(list(coeff['bE0'])[0])
+                              bV0 = float(list(coeff['bV0'])[0])
+                              bB = float(list(coeff['bB'])[0])
+                              bBP = float(list(coeff['bBP'])[0])
+                              E0_err = float(list(coeff['E0_err'])[0])
+                              V0_err = float(list(coeff['V0_err'])[0])
+                              B_err = float(list(coeff['B_err'])[0])
+                              BP_err = float(list(coeff['BP_err'])[0])
+
+                              self.pade_curve = pd.DataFrame(\
+                                        {\
+                                       'E0p': [ E0*k/(bE0 + k) for k in kpt_space],\
+                                       'V0p': [ V0*k/(bV0 + k) for k in kpt_space],\
+                                       'Bp': [ B*k/(bB + k) for k in kpt_space],\
+                                       'BPp': [ BP*k/(bBP + k) for k in kpt_space],\
+                                       'k': kpt_space,\
+                                       'code': [c for k in kpt_space],\
+                                       'exchange': [e for k in kpt_space],\
+                                       'element': [el for k in kpt_space],\
+                                       'structure': [st for k in kpt_space]})
+
+                              #print (self.pade_curve)
+                              self.E0p = E0
+                              self.V0p = V0
+                              self.Bp = B
+                              self.BPp = BP
+
+                        except:
+                              #logger.warn('precision EXCEPTIONS')
+
+                              self.pade_curve = pd.DataFrame(\
+                                        {\
+                                       'E0p': [ None for k in kpt_space],\
+                                       'V0p': [ None for k in kpt_space],\
+                                       'Bp': [ None for k in kpt_space],\
+                                       'BPp': [ None for k in kpt_space],\
+                                       'k': kpt_space,\
+                                       'code': [c for k in kpt_space],\
+                                       'exchange': [e for k in kpt_space],\
+                                       'element': [el for k in kpt_space],\
+                                       'structure': [st for k in kpt_space]})#[st for b in sBPk_err] } )
+
+                        self.pade_frames.append(self.pade_curve)
+                                                   #print (self.prec_result)
+        self.pade_curve_table = pd.concat(self.pade_frames)
+
 
     def create_precisions(self):
         """
@@ -383,6 +466,7 @@ class DatabaseData:
         calculate the precisions and returns plottables to do linear regression
         with
         """
+        #print (self.ev_fit_table, self.pade_analysis_table)
         print ('calling create precisions')
         #print (self.pade_analysis_table)
         self.frames = []
@@ -392,23 +476,24 @@ class DatabaseData:
                 exch = code[code['exchange']==e]
                 for el in np.unique(exch['element']):
                     elem = exch[exch['element']==el]
-                    print ('at el')
+                    #print ('at el')
                     for st in np.unique(elem['structure']):
                         struct = elem[elem['structure']==st]
-                        tags = {'code': c,
-                            'exchange': e,
-                            'element': el,
-                            'structure': st}
+                        tags = {'code': str(c),
+                            'exchange': str(e),
+                            'element': str(el),
+                            'structure': str(st)}
+                        #print (self.ev_fit_table)
                         coeff = self.create_crossfilts(tags,self.pade_analysis_table)
                         vals = self.create_crossfilts(tags,self.ev_fit_table)
                         kpts = list(vals['k'])
-                        print (kpts)
+                        #print (kpts)
                         #print (vals)
                         E0k, sE0k, sE0k_err, V0k, sV0k, sV0k_err, Bk, sBk, sBk_err, BPk, sBPk, sBPk_err =self.pade_precision(coeff,vals,kpts)
                         #Ek, vk, Bk, BPk = self.pade_precision(coeff, vals)
 
                         if sBPk_err:
-                           print ('LENGTH of precs', len(sE0k),len(sE0k_err),len(sV0k),len(sV0k_err))
+                           #print ('LENGTH of precs', len(sE0k),len(sE0k_err),len(sV0k),len(sV0k_err))
                            self.prec_result = pd.DataFrame(\
                                         {\
                                        'E0k': E0k,
@@ -518,20 +603,45 @@ class DatabaseData:
         and Pade from the E(V,k) fit
 
         Returns:
-           Matplotlib figure object
+           bokeh plottables
         """
-        fig = plt.figure()
         eos_source = self.ev_fit_table
-        pade_source = self.prec_table
-        x_kpts = pade_source['k']
-        y_pade = pade_source['{}k'.format(properties)]
-        y_eos = eos_source['{}'.format(properties)]
-        y_eos_err = eos_source['{}_err'.format(properties)]
-        plt.xscale('log')
-        plt.scatter(x_kpts,y_eos)
-        plt.plot(x_kpts,y_pade,color='black')
-        plt.errorbar(x_kpts,y_eos_err,linestyle='',color='red')
-        return fig
+        x_eos_kpts = list(eos_source['k'])
+        y_eos = eos_source['{}k'.format(properties)]
+        y_eos_err = eos_source['{}k_err'.format(properties)]
+
+        pade_source = self.pade_curve_table
+        x_pade_kpts = list(pade_source['k'])
+        y_pade = pade_source['{}p'.format(properties)]
+
+        xs_err = []
+        ys_err = []
+        for x, y, yerr in zip(x_eos_kpts, y_eos, y_eos_err):
+            xs_err.append((x, x))
+            ys_err.append((y - yerr, y + yerr))
+        return x_eos_kpts, y_eos, xs_err, ys_err, x_pade_kpts, y_pade
+
+    def create_precision_bokeh_compat(self,prop_data,energy_data,properties):
+        """
+        Returns data for the log-log plot of precision
+        """
+        dframe = pd.DataFrame({'X':energy_data, 'Y':prop_data})
+        dframe.to_csv('Rdata_linear.csv', index=False)
+        try:
+           os.system('Rscript {}'.format('./regression_linear_model.R'))
+        except:
+           print (name, 'warnings')
+
+        try:
+           params = pd.read_csv('params.csv')
+           preds = pd.read_csv('predicts.csv')
+           pred_x = preds['x']
+           pred_f = preds['f']
+        except:
+           params = pd.DataFrame( {'C':[np.nan],'M':[np.nan],'C_err':[np.nan],'M_err':[np.nan]} )
+
+        return prop_data, energy_data, params['M'][0], params['C'][0], pred_x, pred_f
+
 
     def fit_tls_regression(self, name, X, X_err, Y, Y_err, rscript='regression_linear_model.R'):
         """

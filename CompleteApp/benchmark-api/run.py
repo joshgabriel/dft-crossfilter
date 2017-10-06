@@ -13,8 +13,8 @@ if __name__ == '__main__':
     port = arguments['--port']
     debug = not arguments['--no-debug']
 
-    if not port: port = 7200
-    if not host: host = 'www.dftbenchmarkmgi.com'
+    if not port: port = 6400
+    if not host: host = '0.0.0.0'
     app.run(debug=debug, port=port, host=host)
 
 #app.run(debug=debug, host=host, port=int(port))

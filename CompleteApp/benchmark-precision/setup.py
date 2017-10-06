@@ -12,5 +12,6 @@ setup(name='benchprec',
       description='Package for Benchmark Database',
       author='Joshua Gabriel',
       author_email='joshgabriel92@ufl.edu',
-      packages=['precision']
+      packages=['precision'],
+      package_data = {'precision':'*.R'}
       )
