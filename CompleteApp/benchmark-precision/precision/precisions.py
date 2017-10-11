@@ -625,7 +625,7 @@ class DatabaseData:
         """
         Returns data for the log-log plot of precision
         """
-        dframe = pd.DataFrame({'X':energy_data, 'Y':prop_data})
+        dframe = pd.DataFrame({'X':list(abs(energy_data)), 'Y':prop_data})
         dframe.to_csv('Rdata_linear.csv', index=False)
         try:
            os.system('Rscript {}'.format('./regression_linear_model.R'))

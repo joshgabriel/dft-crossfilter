@@ -2,9 +2,11 @@ mydata = read.csv('./Rdata_linear.csv')
 
 #mydata
 
-x = mydata$X
-y = mydata$Y
+x = abs(mydata$X)
+y = abs(mydata$Y)
 
+x
+y
 power_law <-lm('log10(y)~log10(x)')
 
 summary(power_law)

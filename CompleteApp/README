@@ -9,7 +9,6 @@ The package now contains
 - crossfilter_app*! - the working main page bokeh app for now
 - prec_analysis*! - under dev bokeh app for plotting visualizations 
                      - pade function with R interaction for fitting
-- crossfilter_prec_app ** - currently running on the server as a hybrid of the above two
 - accuracy_correlation*! - TO DO: a machine learning app that finds correlations in accuracies 
                         between different properties. 
 
@@ -31,40 +30,3 @@ To create a new app which has a new model:
   - if new python/R analysis tools are required edit precisions.py and other
     *.py scripts in benchmark-precision. Do a python setup.py install for benchmark-precision
 
-INSTALLATION:
-
-Assuming you have mongodb 2.6.10 setup and running
-
-1. Create a conda virtual environment with python 3.4.5 and install the packages below
-   $ conda create -n Bokeh_Prec_App_Py345 python=3.4.5
-   $ source activate Bokeh_Prec_App_Py345 ## on server do source /home/ubuntu/anaconda/bin/activate Bokeh_Prec_App_Py345
-   $ conda install numpy scipy matplotlib ipython pandas bokeh==0.12.3
-   $ conda install -c r r-base
-   $ pip install MPInterfaces_Latest
-   $ cp eos.py /path/to/ase/installtion ## on server this is /home/ubuntu/anaconda/envs/Bokeh_Prec_App_Py345/lib/python3.4/site-packages/ase/
-
-2. Install the dependencies for benchmark-api and benchmark-db
-   $ cd benchmark-db
-   $ pip install -r requirements.txt
-   $ cd benchmark-api
-   $ pip install -r requirements.txt
-
-3. Install the benchmark-db and benchmark-precision packages
-   $ cd benchmark-db
-   $ python setup.py install
-   $ cd benchmark-precision
-   $ python setup.py install
-
-4. Run the API
-   $ cd benchmark-api
-   $ python run.py & ## defaults to run internally on 0.0.0.0:6400
-
-5. Use the Test_api.py script in benchmark-api to submit data to the appropriate endpoints
-
-6. Setup nginx sites-available file for the new site
-
-7. start the bokeh server with the command
-
-   bokeh serve crossfilter_prec_app/ --log-level = debug --host <server_host>:80 --host 0.0.0.0:80 --port 5700 &
-
-Go to <server_host_ip>/crossfilter_prec_app and you should see the app running!

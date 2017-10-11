@@ -434,6 +434,14 @@ class CrossFiltDFs():
        self.plot_data.
        This controls the first plot canvas
        """
+#       self.query_dict={'code':code.value,'exchange':exchange.value,\
+#                    'structure':struct.value,'element':element.value,'properties':prop.value}
+#       print ('POSTING', self.query_dict)
+#       self.query_api(endpoint='evk')
+
+       #layout_doc.children[4].children[0] = self.plot_pade_figure()
+
+
        self.query_dict={'code':code.value,'exchange':exchange.value,\
                     'structure':struct.value,'element':element.value,'properties':prop.value}
        print ('POSTING', self.query_dict)
@@ -530,7 +538,7 @@ class CrossFiltDFs():
         p = figure(plot_height=400, plot_width=400,tools="pan,wheel_zoom,box_zoom,reset,previewsave",\
         x_axis_type="log", y_axis_type="log", x_axis_label='Energy Convergence (meV/atom)',  title='Slope M is {0}'.format(str(M)) )
         p.line(pred_energy, pred_property, color='red')
-        p.circle(energy_data, prop_data, color='blue',size=5, line_alpha=0)
+        p.circle(self.energy_data, self.prop_data, color='blue',size=5, line_alpha=0)
         #p.multi_line(xs_err, ys_err, color='black')
         if self.properties == 'B':
             p.yaxis.axis_label = 'Bulk Modulus B (%)'
