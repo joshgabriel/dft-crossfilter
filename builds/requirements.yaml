@@ -10,7 +10,7 @@ dependencies:
   - boto3
   - node
   - gunicorn
-  - bokeh
+  - bokeh==0.12.3
   - pip:
     - mongoengine==0.8.7
     - flask-mongoengine==0.7.1
@@ -23,4 +23,3 @@ dependencies:
     - uwsgi
     - flask-restful-swagger
     - simplejson
-    - bokeh

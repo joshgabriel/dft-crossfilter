@@ -66,3 +66,9 @@
       tags: [serve]
       vars:
         app_path: "{{ benchmark_path }}/benchmark-view"
+
+    - include: serve_view2.yaml
+      when: inventory_hostname in groups['view']
+      tags: [serve]
+      vars: 
+        app_path: "{{ benchmark_path }}/CompleteApp"
